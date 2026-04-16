@@ -1,0 +1,14 @@
+.DS_Store
+*.swp
+*.swo
+node_modules/
+
+# Runtime output (generated digests should not be tracked)
+news-digest-output/
+*.html
+!references/*.html
+
+# OS / editor
+Thumbs.db
+.idea/
+.vscode/
