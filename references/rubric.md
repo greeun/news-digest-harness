@@ -54,6 +54,16 @@ Regardless of other scores, these immediately fail the digest:
 - Any spec.md item is missing or has placeholder content.
 - Page does not render standalone (file:// protocol).
 
+## BLOCKING Gate — 감각적 한계 (점수와 무관, 영구)
+
+PASS를 내기 전 반드시 충족한다. 미충족 시 Verdict = **BLOCKED**(점수가 아무리 높아도):
+
+- 렌더 스크린샷(desktop/mobile)이 존재하고, Evaluator가 그것을 읽어 Visual Design 채점에 반영했다.
+- 사람의 비주얼 사인오프(`visual_signoff.md`)가 기록되었다.
+- 인터랙션 중 콘솔 에러 0(`console.log`).
+
+이 게이트는 LLM이 코드만으로 레이아웃 균형·색 대비·여백 리듬·폰트 느낌을 *볼* 수 없는 **감각적 한계**를 보상한다. 다른 모든 하네스 컴포넌트와 달리 모델 업그레이드로 제거되지 않는다(비타협 원칙 8).
+
 ## Calibration Notes
 
 - **Topic Relevance**: Watch for these drift patterns:
@@ -78,5 +88,7 @@ Regardless of other scores, these immediately fail the digest:
   - Mobile layout that's just "everything stacked" with no thought
   - **Palette mismatch with topic** (e.g., 기후 digest in hot red, K-POP digest in muted gray) — score ≤3 on design.
   - Purple/blue AI-style gradient used for every non-AI topic.
+  - **슬롭 테스트**: "주제 단어를 다 지워도 다른 아무 주제에나 그대로 얹을 수 있는 디자인인가?" Yes면 generic-anywhere 슬롭 → ≤3. generator-prompt.md "Anti-Slop 대조"의 어느 쌍(1~6)에 걸렸는지 명시.
+  - **비주얼 디테일 실패**(스크린샷에서): 카드/태그/배지 오버랩, `overflow:hidden` 클립, 긴 헤드라인 레이아웃 깨짐, 모바일(~390px) 가로 스크롤 — 발견 시 ≤3.
 
 - **Late-stage creative leaps**: If the Generator produces a genuinely innovative design approach on a later iteration (e.g., timeline layout, data viz for prices/rankings), evaluate it on merit against the rubric — don't penalize for departing from a conventional card layout if the result scores higher on design quality AND still respects topic relevance.

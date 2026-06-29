@@ -1,6 +1,6 @@
 # News Digest Harness (Topic-Agnostic)
 
-> **v1.0.0** · Planner → Generator → Evaluator harness for any-topic Korean news digests
+> **v1.1.0** · Planner → Generator → Evaluator harness (with render + human visual checkpoint) for any-topic Korean news digests
 
 A Claude Code skill that takes a **user-provided topic** (e.g. crypto, semiconductors, Korean politics, climate, K-content, real estate, Tesla, biotech), collects the latest real-world news from the web, summarizes them in natural Korean, and delivers a polished, self-contained HTML page — powered by the **Planner → Generator → Evaluator** harness pattern from Anthropic's [Harness Design for Long-Running Application Development](https://www.anthropic.com/engineering/harness-design-long-running-apps) (Prithvi Rajasekaran, 2026).
 
@@ -21,33 +21,45 @@ The harness attacks all three structurally, not with more instructions to a sing
 ```
 User: "암호화폐 뉴스 정리해줘"
         │
-        ▼
+        ▼  ★Gate 1: orchestrator confirms topic
 ┌──────────────────────┐   spec.md   ┌──────────────────────┐
 │       Planner        │ ──────────▶ │      Generator        │
 │  Topic → categories  │             │   Topic-aware HTML    │
 │  + WebSearch         │             │   (single file)       │
 └──────────────────────┘             └──────────┬────────────┘
         │                                       │
-  User confirms                      generator_report.md
-  spec.md                                       │
+  ★Gate 2: orchestrator              generator_report.md
+  shows spec.md to user                         │
                                                 ▼
+                                  ┌────────────────────────────┐
+                                  │ Render + Screenshot         │
+                                  │ (orchestrator, agent-browser)│
+                                  │  desktop + mobile, console   │
+                                  └──────────┬─────────────────┘
+                                             │
+                                  ★Gate 3: human visual sign-off
+                                             │
+                                             ▼
                                      ┌──────────────────────┐
                                      │      Evaluator        │
                                      │  Topic Relevance 2x   │
+                                     │  + sensory-limit gate │
                                      │  + adversarial QA     │
                                      └──────────┬────────────┘
                                                 │
-                                      critique.md (PASS/FAIL)
+                                  critique.md (PASS / FAIL / BLOCKED)
                                                 │
                         ┌───────────────────────┴───────────────────────┐
                         │                                               │
-                      PASS                                            FAIL
+                      PASS                                        FAIL / BLOCKED
                         │                                               │
                         ▼                                               ▼
              news-digest-{topic}-                              Fresh Generator
-             {datetime}.html                                   with critique.md
-                                                               (up to 3 rounds)
+             {datetime}.html                                   + critique.md
+             (highest-scoring version)                         (up to 3 rounds)
 ```
+
+**All three ★gates are run by the orchestrator (the main thread).** Sub-agents (Planner/Generator/Evaluator) never talk to the user — they only read and write files; the orchestrator relays.
 
 ### Three Agents, Structurally Separated
 
@@ -67,6 +79,8 @@ Agents never see each other's reasoning. They communicate **exclusively through 
 4. **Context resets over compaction** — Compaction preserves continuity but not context anxiety; resets eliminate both
 5. **Rubric-based evaluation with evidence** — "It looks fine" is never a pass
 6. **Every component encodes an assumption** — Remove one at a time on model upgrade; radical simplification fails
+7. **Gates are run by the orchestrator** — User confirmation gates (topic, spec, visual sign-off) go through the main thread; sub-agents only exchange files
+8. **Sensory-limit gate is permanent** — Render + screenshot + human visual sign-off compensates for what an LLM cannot *see*; it survives model upgrades (the exception to principle 6)
 
 ## What's different from the AI-only sibling
 
@@ -163,16 +177,18 @@ news-digest-harness/
 ├── README.ko.md                    # Korean documentation
 └── references/
     ├── planner-prompt.md           # Topic research + spec writing + auto-categorize
-    ├── generator-prompt.md         # HTML generation with topic fidelity rules
-    ├── evaluator-prompt.md         # Rubric-based QA + Instant-FAIL conditions
-    └── rubric.md                   # 7 criteria, scoring guide, calibration notes
+    ├── generator-prompt.md         # HTML generation: topic fidelity + anti-slop + visual-detail rules
+    ├── evaluator-prompt.md         # Rubric-based QA + Instant-FAIL + sensory-limit gate
+    ├── rubric.md                   # 7 criteria, scoring guide, calibration notes
+    └── screenshot-checkpoint.md    # Render + screenshot + human visual sign-off (★Gate 3)
 ```
 
 ## Requirements
 
 - [Claude Code](https://claude.ai/claude-code) CLI
-- Claude Opus 4.6 (recommended) or Sonnet 4.5+
+- Claude Opus 4.8 (recommended) or Sonnet 4.6+
 - Internet access for WebSearch/WebFetch (news collection)
+- agent-browser skill — render + screenshot for the visual checkpoint (★Gate 3)
 
 ## Credits
 

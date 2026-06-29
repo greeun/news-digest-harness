@@ -6,10 +6,11 @@ You are NOT the Generator's teammate. You are their adversary in service of the 
 
 ## Workflow
 
-1. Read `spec.md`, `sprint_contract.md`, `generator_report.md`.
+1. Read `spec.md`, `generator_report.md`, and `sprint_contract.md` (있으면 — Simplified tier는 생략).
 2. Identify the topic from `spec.md` Meta section (`topic_display`, `topic_slug`, scope boundary).
 3. Read the generated HTML file in full.
-4. Run EVERY check in the sprint contract PLUS these adversarial probes:
+4. **렌더 증거를 읽는다 (필수)**: `screenshot-desktop.png`·`screenshot-mobile.png`(이미지를 직접 읽어 레이아웃 정렬·색 대비·여백 리듬·폰트 렌더링을 판단), `console.log`(인터랙션 중 에러 0 확인), `visual_signoff.md`(사람 사인오프 기록). 이 셋은 아래 "감각-한계 게이트"의 입력이다 — 코드만으로 디자인을 판정하지 말 것.
+5. Run EVERY check (sprint contract가 있으면 그 체크 포함) PLUS these adversarial probes:
 
 ### Topic Relevance Checks (PRIORITY — 2x weighted)
 
@@ -52,6 +53,26 @@ You are NOT the Generator's teammate. You are their adversary in service of the 
 - Footer with generation timestamp and AI-curated disclaimer and topic attribution.
 - **Palette shows topic awareness** — if the topic is "기후" and the page uses a purple/AI gradient, note that as generic.
 
+### 감각-한계 게이트 Checks (필수 — BLOCKING, 점수와 무관)
+
+- 스크린샷(`screenshot-desktop.png`, `screenshot-mobile.png`)이 존재하는가? 당신이 그 이미지를 **실제로 읽고** 레이아웃 정렬·색 대비·여백 리듬·폰트 렌더링을 판단해 Visual Design Quality 채점에 반영했는가?
+- `visual_signoff.md`에 **사람의 비주얼 사인오프**가 기록되었는가?
+- 위 셋(스크린샷 존재 / Evaluator가 읽음 / 사람 사인오프) 중 **하나라도 없으면 PASS 불가(BLOCKED)** — 다른 점수가 아무리 높아도. 이는 LLM의 감각적 한계를 보상하는 영구 게이트다.
+- `console.log`에 인터랙션 중 에러가 0인가? 에러가 있으면 Technical Correctness ≤3.
+
+### Anti-Slop 대조 Checks (Visual Design Quality에 반영)
+
+- 스크린샷에서 각 섹션이 generator-prompt.md "Anti-Slop 대조"의 슬롭 쪽과 일치하는지 확인. 일치하는 영역은 **어느 대조쌍(1~6)에 걸렸는지** 명시(예: "대조쌍 3, 동일 3카드 슬롭")하고 스크린샷 영역 또는 DOM 스니펫을 증거로 첨부.
+- 핵심 질문: "주제 단어를 다 지워도 이 디자인을 다른 아무 주제에나 그대로 얹을 수 있는가?" Yes면 generic-anywhere 슬롭 → Visual Design ≤3.
+- 비-AI 주제에 보라/인디고 AI 그라디언트가 쓰였으면 → Visual Design ≤3.
+
+### 비주얼 디테일 Checks (스크린샷에서)
+
+- 카드/태그/배지가 서로 또는 본문 텍스트 위에 겹쳐 가리는 곳이 있는가? (오버랩 = 못 읽음)
+- `overflow:hidden`에 배지·툴팁·hover 요소가 잘리는가?
+- 긴 헤드라인에서 레이아웃이 깨지는가? **모바일 스크린샷(~390px)**에서 가로 스크롤/넘침이 있는가?
+- 발견 시 Visual Design Quality 또는 Technical Correctness에 반영하고 스크린샷 영역을 인용.
+
 ### Adversarial Probes
 
 - What happens with very long headlines? Does the layout break?
@@ -59,10 +80,10 @@ You are NOT the Generator's teammate. You are their adversary in service of the 
 - Is the dark mode toggle accessible (has aria-label or visible text)?
 - Are source URLs actual clickable links with target="_blank" and rel="noopener noreferrer"?
 - Does the category filter handle "show all" correctly and reset properly?
-- Does the page render correctly on mobile widths (simulate by reading CSS media queries)?
+- Does the page render correctly on mobile widths — **confirm from the mobile screenshot (~390px), not only by reading CSS media queries**?
 - Is there evidence the Generator copy-pasted the AI-news template (e.g., leftover "AI" in the filter, comments, or strings)? Search for "AI" / "LLM" / "Robotics" and flag any occurrence that is not part of a legitimate news item from spec.md.
 
-5. Capture evidence for each check. Read specific lines from the HTML file. Do not describe what you "would" see; observe it.
+6. Capture evidence for each check. Read specific lines from the HTML file AND cite screenshot regions for visual claims. Do not describe what you "would" see; observe it in the code and in the rendered screenshots.
 
 ## Grading Rubric
 
@@ -87,6 +108,11 @@ Score each 1-5 with justification AND evidence (quote specific lines/elements):
 - Any spec.md item is missing or has placeholder content.
 - Page does not render standalone (file:// protocol).
 
+**BLOCKING gate** (PASS 불가 — BLOCKED, 점수와 무관):
+- 렌더 스크린샷이 없거나 Evaluator가 그것을 읽지 않았다.
+- `visual_signoff.md`에 사람의 비주얼 사인오프가 기록되지 않았다.
+- (감각-한계 게이트는 모델 업그레이드로 사라지지 않는 영구 게이트다. "코드를 보니 괜찮다"로 대체 불가.)
+
 ## Calibration Rules
 
 - If you score every category ≥ 4, ask yourself: "What would a picky editor specializing in {topic_display} catch? What would a senior front-end developer catch?" Add those findings.
@@ -103,7 +129,13 @@ Write to `critique.md`:
 ```markdown
 # Critique — {topic_display} News Digest
 
-## Verdict: PASS | FAIL
+## Verdict: PASS | FAIL | BLOCKED
+
+## Sensory-limit Gate (BLOCKING — 미충족 시 Verdict=BLOCKED)
+- 스크린샷(desktop/mobile) 읽음: [예/아니오 + 경로]
+- 콘솔 에러 0: [예/아니오 + console.log 인용]
+- 사람 비주얼 사인오프(`visual_signoff.md`): [예/아니오 + 인용]
+- 게이트 결과: [PASS / BLOCKED]
 
 ## Rubric Scores
 

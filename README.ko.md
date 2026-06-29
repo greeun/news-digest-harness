@@ -1,6 +1,6 @@
 # 주제 불문 뉴스 다이제스트 하네스
 
-> **v1.0.0** · Planner → Generator → Evaluator 하네스로 임의 주제의 한국어 뉴스 페이지를 생성
+> **v1.1.0** · Planner → Generator → Evaluator 하네스(렌더 + 사람 비주얼 체크포인트 포함)로 임의 주제의 한국어 뉴스 페이지를 생성
 
 **사용자가 입력한 임의의 주제**(예: 암호화폐, 반도체, 한국 정치, 기후, K-콘텐츠, 부동산, 테슬라, 바이오)에 대해 웹에서 실제 최신 뉴스를 수집하고, 자연스러운 한국어로 요약하여, 정갈한 디자인의 단일 HTML 페이지로 제공하는 Claude Code 스킬입니다. Anthropic의 [Harness Design for Long-Running Application Development](https://www.anthropic.com/engineering/harness-design-long-running-apps) (Prithvi Rajasekaran, 2026)에서 제시한 **Planner → Generator → Evaluator** 하네스 패턴을 적용합니다.
 
@@ -21,33 +21,45 @@
 ```
 사용자: "암호화폐 뉴스 정리해줘"
         │
-        ▼
+        ▼  ★게이트 1: 오케스트레이터가 주제 확정
 ┌──────────────────────┐   spec.md   ┌──────────────────────┐
 │       Planner        │ ──────────▶ │      Generator        │
 │  주제 → 카테고리      │             │   주제 인식 HTML      │
 │  + 웹 검색            │             │   (단일 파일)         │
 └──────────────────────┘             └──────────┬────────────┘
         │                                       │
-  사용자가 spec                       generator_report.md
-  확인 후 진행                                   │
+  ★게이트 2: 오케스트레이터가              generator_report.md
+  spec.md를 사용자에게 확인                       │
                                                 ▼
+                                  ┌────────────────────────────┐
+                                  │ 렌더 + 스크린샷             │
+                                  │ (오케스트레이터,            │
+                                  │  agent-browser, 데/모+콘솔)  │
+                                  └──────────┬─────────────────┘
+                                             │
+                                  ★게이트 3: 사람 비주얼 사인오프
+                                             │
+                                             ▼
                                      ┌──────────────────────┐
                                      │      Evaluator        │
                                      │  주제 정합성 2x       │
+                                     │  + 감각-한계 게이트   │
                                      │  + 적대적 QA          │
                                      └──────────┬────────────┘
                                                 │
-                                      critique.md (PASS/FAIL)
+                                  critique.md (PASS / FAIL / BLOCKED)
                                                 │
                         ┌───────────────────────┴───────────────────────┐
                         │                                               │
-                      PASS                                            FAIL
+                      PASS                                       FAIL / BLOCKED
                         │                                               │
                         ▼                                               ▼
              news-digest-{topic}-                              새 Generator에
              {datetime}.html                                   critique.md 전달
-                                                               (최대 3회 반복)
+             (최고점 버전 선택)                                (최대 3회 반복)
 ```
+
+**3개 ★게이트는 모두 오케스트레이터(메인 스레드)가 수행합니다.** 서브에이전트(Planner/Generator/Evaluator)는 사용자와 대화하지 않고 파일만 입출력하며, 오케스트레이터가 중개합니다.
 
 ### 세 에이전트의 구조적 분리
 
@@ -61,14 +73,16 @@
 
 ## 적용된 하네스 원칙
 
-원문 아티클의 6가지 핵심 원칙을 인코딩합니다:
+원문 아티클의 핵심 원칙에 게이트 주체·감각-한계 원칙을 더해 인코딩합니다:
 
 1. **구조적 역할 분리** — 생성과 평가를 별도 서브에이전트 프로세스로 (GAN 영감)
-2. **파일 기반 핸드오프** — `spec.md`, `sprint_contract.md`, `generator_report.md`, `critique.md`
-3. **구현 전 스프린트 계약** — Generator가 코딩 전에 범위와 검증 항목을 합의
+2. **파일 기반 핸드오프** — `spec.md`, `generator_report.md`, 스크린샷, `critique.md` (`sprint_contract.md`는 Full harness 시)
+3. **구현 전 스프린트 계약** — (Full harness 시) Generator가 코딩 전에 범위와 검증 항목을 합의
 4. **압축 대신 컨텍스트 리셋** — 압축은 연속성은 유지하지만 불안은 해소 못 함; 리셋은 둘 다 제거
 5. **증거 기반 루브릭 평가** — "괜찮아 보인다"는 절대 통과가 아님
 6. **모든 컴포넌트는 가정을 인코딩** — 모델 업그레이드 시 한 번에 하나씩 제거; 급진적 단순화는 실패
+7. **게이트 주체는 오케스트레이터** — 사용자 게이트(주제·spec·비주얼 사인오프)는 메인 스레드를 경유; 서브에이전트는 파일만 교환
+8. **감각-한계 게이트는 영구** — 렌더 + 스크린샷 + 사람 비주얼 사인오프는 LLM이 *볼* 수 없는 것을 보상; 모델 업그레이드로 사라지지 않음 (원칙 6의 예외)
 
 ## AI 전용 자매 스킬과의 차이
 
@@ -165,16 +179,18 @@ news-digest-harness/
 ├── README.ko.md                    # 이 파일 (한국어)
 └── references/
     ├── planner-prompt.md           # 주제 리서치 + spec 작성 + 카테고리 자동 도출
-    ├── generator-prompt.md         # 주제 충실성 규칙을 적용한 HTML 생성
-    ├── evaluator-prompt.md         # 루브릭 기반 QA + Instant-FAIL 조건
-    └── rubric.md                   # 7개 평가 기준, 점수 가이드, 캘리브레이션
+    ├── generator-prompt.md         # HTML 생성: 주제 충실성 + anti-slop + 비주얼 디테일 규칙
+    ├── evaluator-prompt.md         # 루브릭 기반 QA + Instant-FAIL + 감각-한계 게이트
+    ├── rubric.md                   # 7개 평가 기준, 점수 가이드, 캘리브레이션
+    └── screenshot-checkpoint.md    # 렌더 + 스크린샷 + 사람 비주얼 사인오프 (★게이트 3)
 ```
 
 ## 요구 사항
 
 - [Claude Code](https://claude.ai/claude-code) CLI
-- Claude Opus 4.6 (권장) 또는 Sonnet 4.5+
+- Claude Opus 4.8 (권장) 또는 Sonnet 4.6+
 - 인터넷 접속 (뉴스 수집을 위한 WebSearch/WebFetch)
+- agent-browser 스킬 — 비주얼 체크포인트(★게이트 3)용 렌더 + 스크린샷
 
 ## 크레딧
 
